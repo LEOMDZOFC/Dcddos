@@ -1,121 +1,192 @@
-from flask import Flask, request, jsonify, send_from_directory
-import threading
-import requests
-import random
+import asyncio
+import aiohttp
+from flask import Flask, request, jsonify
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad
+import binascii
+from secret import *
+import uid_generator_pb2
 import time
-from uuid import uuid4
+from datetime import datetime
+import random
 
 app = Flask(__name__)
-app.secret_key = 'chave-secreta-aescorp'
 
-sessoes = {}
+# تخزين المفاتيح هنا
+api_keys = set()
 
-def gerar_device_id():
-    return str(uuid4())
+last_like_time = {}
 
-def gerar_user_agent():
-    agentes = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-        "Mozilla/5.0 (Linux; Android 10)",
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)",
-    ]
-    return random.choice(agentes) + f" AppleWebKit/{random.randint(500, 599)}.36 (KHTML, like Gecko) Chrome/{random.randint(80, 105)}.0.{random.randint(1000, 4999)}.100 Safari/{random.randint(500, 599)}.36"
+def create_protobuf(saturn_, garena):
+    message = uid_generator_pb2.uid_generator()
+    message.saturn_ = saturn_
+    message.garena = garena
+    return message.SerializeToString()
 
-def enviar_pacote(ip, username, mensagem):
-    payload = {
-        "username": username,
-        "question": mensagem,
-        "deviceId": gerar_device_id()
-    }
+def protobuf_to_hex(protobuf_data):
+    return binascii.hexlify(protobuf_data).decode()
+
+def encrypt_aes(hex_data, key, iv):
+    key = key.encode()[:16]
+    iv = iv.encode()[:16]
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    padded_data = pad(bytes.fromhex(hex_data), AES.block_size)
+    encrypted_data = cipher.encrypt(padded_data)
+    return binascii.hexlify(encrypted_data).decode()
+
+# إدارة المفاتيح
+@app.route('/make_key', methods=['GET'])
+def make_key():
+    key = request.args.get('key')
+    if not key:
+        return jsonify({'error': 'Missing key parameter'}), 400
+    api_keys.add(key)  # إضافة المفتاح للمجموعة
+    return jsonify({'message': 'Key added successfully', 'key': key}), 200
+
+@app.route('/del_key', methods=['GET'])
+def del_key():
+    key = request.args.get('key')
+    if not key:
+        return jsonify({'error': 'Missing key parameter'}), 400
+    if key in api_keys:
+        api_keys.remove(key)
+        return jsonify({'message': 'Key deleted successfully', 'key': key}), 200
+    else:
+        return jsonify({'error': 'Key not found'}), 404
+
+@app.route('/del_all_keys', methods=['GET'])
+def del_all_keys():
+    api_keys.clear()
+    return jsonify({'message': 'All keys deleted successfully'}), 200
+
+@app.route('/all_keys', methods=['GET'])
+def all_keys():
+    return jsonify({'keys': list(api_keys)}), 200
+
+# التحقق من صحة المفتاح
+def verify_key(key):
+    return key in api_keys
+
+# دالة الإعجاب
+async def like(id, session, token):
+    like_url = 'https://clientbp.ggblueshark.com/LikeProfile'
     headers = {
-        "User-Agent": gerar_user_agent(),
-        "Content-Type": "application/json"
+        'X-Unity-Version': '2018.4.11f1',
+        'ReleaseVersion': 'OB48',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-GA': 'v1 1',
+        'Authorization': f'Bearer {token}',
+        'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 7.1.2; ASUS_Z01QD Build/QKQ1.190825.002)',
+        'Host': 'clientbp.ggblueshark.com',
+        'Connection': 'Keep-Alive',
+        'Accept-Encoding': 'gzip'
     }
 
+    data = bytes.fromhex(id)
+
+    async with session.post(like_url, headers=headers, data=data) as response:
+        status_code = response.status
+        response_text = await response.text()
+        return {
+            'status_code': status_code,
+            'response_text': response_text
+        }
+
+async def get_account_info(uid, session):
+    info_url = f'http://164.92.134.31:5002/{uid}'
+    async with session.get(info_url) as response:
+        if response.status == 200:
+            return await response.json()
+        else:
+            return None
+
+async def get_tokens(session):
+    url = 'http://164.92.134.31:5003/token'
+    async with session.get(url) as response:
+        if response.status == 200:
+            tokens = await response.json()  # تحويل النتيجة إلى JSON
+            token_list = tokens.get('tokens', [])  # الحصول على قائمة tokens
+            return token_list[:100]  # إرجاع أول 99 توكن فقط
+        else:
+            return []  # إرجاع قائمة فارغة في حالة فشل الطلب
+
+async def sendlike(uid, count=1):
+    saturn_ = int(uid)
+    garena = 1
+    protobuf_data = create_protobuf(saturn_, garena)
+    hex_data = protobuf_to_hex(protobuf_data)
+    aes_key = key
+    aes_iv = iv
+    id = encrypt_aes(hex_data, aes_key, aes_iv)
+
+    start_time = time.time()  # بداية المراقبة للوقت
+
+    # تحقق مما إذا كانت قد مرّت 24 ساعة على آخر لايك
+    current_time = datetime.now()
+    last_time = last_like_time.get(uid)
+
+    async with aiohttp.ClientSession() as session:
+        tokens = await get_tokens(session)  # الحصول على قائمة tokens (أول 99 توكن)
+
+        if not tokens:
+            return jsonify({"error": "No tokens available"}), 500
+
+        # جلب معلومات الحساب قبل إضافة الإعجابات
+        account_info_before = await get_account_info(uid, session)
+        if not account_info_before:
+            return jsonify({"error": "Unable to fetch account info before sending likes"}), 500
+
+        likes_before = account_info_before['basicinfo'][0]['likes']  # الإعجابات قبل
+
+        # إرسال الإعجابات
+        tasks = [like(id, session, token) for token in tokens[:count]]  # إرسال عدد محدد من الإعجابات
+        results = await asyncio.gather(*tasks)
+
+        # جلب معلومات الحساب بعد إضافة الإعجابات
+        account_info_after = await get_account_info(uid, session)
+        if not account_info_after:
+            return jsonify({"error": "Unable to fetch account info after sending likes"}), 500
+
+        likes_after = account_info_after['basicinfo'][0]['likes']  # الإعجابات بعد
+
+        # حساب الإعجابات المضافة فعلياً
+        likes_added = likes_after - likes_before
+        failed_likes = sum(1 for result in results if result['status_code'] != 200)  # عدد الإعجابات التي فشلت
+
+        end_time = time.time()  # نهاية المراقبة للوقت
+        elapsed_time = end_time - start_time 
+        
+        last_like_time[uid] = current_time
+
+        return jsonify({
+            'uid': uid,
+            'name': account_info_after['basicinfo'][0].get('username', 'Unknown'),
+            'level': account_info_after['basicinfo'][0].get('level', 'N/A'),
+            'likes_before': likes_before,
+            'likes_after': likes_after,
+            'likes_added': likes_added,
+            'failed_likes': failed_likes,
+            'region': account_info_after['basicinfo'][0].get('region', 'Unknown')
+        }), 200
+
+@app.route('/like', methods=['GET'])
+def like_endpoint():
     try:
-        requests.post("https://ngl.link/api/submit", json=payload, headers=headers)
-    except:
-        pass
+        uid = request.args.get('uid')
+        api_key = request.args.get('key')
+        count = int(request.args.get('count', 99))  # عدد الإعجابات، الافتراضي 1
+        if not uid or not api_key:
+            return jsonify({'error': 'Missing uid or key parameter'}), 400
 
-def enviar_mensagens(ip):
-    sessao = sessoes[ip]
-    username = sessao["username"]
-    mensagem = sessao["mensagem"]
-    sessao["enviando"] = True
-    sessao["enviadas"] = 0
-    sessao["total"] = 100
+        # التحقق من صحة المفتاح
+        if not verify_key(api_key):
+            return jsonify({'error': 'Invalid API key'}), 403
 
-    def disparar():
-        while sessao["enviadas"] < sessao["total"] and sessao["enviando"]:
-            threading.Thread(target=enviar_pacote, args=(ip, username, mensagem)).start()
-            sessao["enviadas"] += 1
-            time.sleep(0.01)  # menor delay possível
-
-    threads = []
-    for _ in range(5):  # 5 threads simultâneas atirando
-        t = threading.Thread(target=disparar)
-        t.start()
-        threads.append(t)
-
-    for t in threads:
-        t.join()
-
-    sessao["enviando"] = False
-
-@app.route('/')
-def index():
-    return send_from_directory('.', 'index.html')
-
-@app.route('/style.css')
-def css():
-    return send_from_directory('.', 'style.css')
-
-@app.route('/atualizar', methods=['POST'])
-def atualizar():
-    ip = request.remote_addr
-    username = request.form.get('username')
-    mensagem = request.form.get('mensagem')
-
-    sessoes[ip] = {
-        "username": username,
-        "mensagem": mensagem,
-        "enviando": False,
-        "enviadas": 0,
-        "total": 100
-    }
-    return jsonify(status="Dados atualizados.")
-
-@app.route('/enviar', methods=['POST'])
-def enviar():
-    ip = request.remote_addr
-    if ip not in sessoes:
-        return jsonify(status="Nenhum dado encontrado."), 400
-    if sessoes[ip]["enviando"]:
-        return jsonify(status="Já enviando."), 400
-
-    thread = threading.Thread(target=enviar_mensagens, args=(ip,))
-    thread.start()
-
-    return jsonify(status="Disparo iniciado.")
-
-@app.route('/parar', methods=['POST'])
-def parar():
-    ip = request.remote_addr
-    if ip in sessoes:
-        sessoes[ip]["enviando"] = False
-        return jsonify(status="Envio interrompido.")
-    return jsonify(status="Nenhum envio ativo.")
-
-@app.route('/progresso')
-def progresso():
-    ip = request.remote_addr
-    if ip in sessoes:
-        return jsonify(
-            enviadas=sessoes[ip]["enviadas"],
-            total=sessoes[ip]["total"]
-        )
-    return jsonify(enviadas=0, total=100)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(sendlike(uid, count))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5008)
