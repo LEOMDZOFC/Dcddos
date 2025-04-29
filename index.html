@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>SPAM NGL LEO MODZ</title>
+  <title>LIKES FF - LEO MODZ</title>
   <style>
     body {
       margin: 0;
@@ -42,8 +42,7 @@
       margin-bottom: 5px;
     }
 
-    input[type="text"],
-    textarea {
+    input[type="text"], textarea {
       width: 100%;
       padding: 10px;
       border: none;
@@ -102,22 +101,22 @@
   <canvas id="matrixCanvas"></canvas>
 
   <div class="container">
-    <h1>SPAM NGL LEO MODZ</h1>
+    <h1>LIKES FF - LEO MODZ</h1>
 
     <form id="formEnviar" action="/enviar" method="post">
-      <label>Username:</label>
-      <input type="text" name="username" required>
+      <label>Digite o UID do jogador:</label>
+      <input type="text" name="uid" required>
 
-      <label>DIGITE A MENSAGEM QUE VC DESEJA DAR SPAM:</label>
-      <textarea name="mensagem" rows="4" required></textarea>
+      <label>Quantidade de Likes:</label>
+      <input type="text" name="quantidade" required>
 
-      <button type="submit">INICIAR SPAM</button>
+      <button type="submit">ENVIAR LIKES</button>
 
       <a href="https://t.me/LEOMODZYTB" target="_blank" class="canal-btn">TELEGRAM DO CRIADOR</a>
     </form>
 
     <p id="status"></p>
-    <p id="contador-label">SPAM ENVIADO</p>
+    <p id="contador-label">LIKES ENVIADOS</p>
     <p id="contador">0 / 100</p>
   </div>
 
@@ -135,7 +134,7 @@
         if (valorAtual >= valor) {
           clearInterval(intervalo);
           animandoContador = false;
-          document.getElementById('status').innerText = 'Status: Disparo concluído.';
+          document.getElementById('status').innerText = 'Status: Likes enviados.';
           return;
         }
         valorAtual += incremento;
@@ -152,7 +151,7 @@
         body: new FormData(form),
       });
 
-      document.getElementById('status').innerText = 'Status: Disparo iniciado.';
+      document.getElementById('status').innerText = 'Status: Enviando likes...';
       valorAtual = 0;
       document.getElementById('contador').innerText = `0 / ${valorFinal}`;
 
@@ -170,26 +169,25 @@
     const letters = '01';
     const fontSize = 14;
     const columns = canvas.width / fontSize;
-    const drops = Array.from({ length: columns }, () => 1)
+    const drops = Array.from({ length: columns }, () => 1);
 
     function draw() {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#f00'; // vermelho
-  ctx.font = `${fontSize}px monospace`;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#f00';
+      ctx.font = `${fontSize}px monospace`;
 
-  drops.forEach((y, x) => {
-    const text = letters.charAt(Math.floor(Math.random() * letters.length));
-    ctx.fillText(text, x * fontSize, y * fontSize);
+      drops.forEach((y, x) => {
+        const text = letters.charAt(Math.floor(Math.random() * letters.length));
+        ctx.fillText(text, x * fontSize, y * fontSize);
 
-    if (y * fontSize > canvas.height && Math.random() > 0.975) {
-      drops[x] = 0;
+        if (y * fontSize > canvas.height && Math.random() > 0.975) {
+          drops[x] = 0;
+        }
+
+        drops[x]++;
+      });
     }
-
-    drops[x]++;
-  });
-}
-
 
     setInterval(draw, 33);
   </script>
