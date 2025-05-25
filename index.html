@@ -2,8 +2,85 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>STANLEY MODZ SPAM NGL</title>
-  <link rel="stylesheet" href="/style.css">
+  <title>STANLEY MODZ SPAM NGL V3</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: black;
+      color: #00ff41;
+      overflow: hidden;
+    }
+
+    .container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.85);
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+      width: 90%;
+      max-width: 400px;
+      z-index: 1;
+    }
+
+    input[type="text"],
+    textarea {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid #00ff41;
+      border-radius: 5px;
+      background: #111;
+      color: #00ff41;
+    }
+
+    button {
+      background-color: #00ff41;
+      color: black;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #00cc33;
+    }
+
+    .canal-btn {
+      display: inline-block;
+      text-decoration: none;
+      padding: 10px;
+      background-color: transparent;
+      color: #00ff41;
+      border: 1px solid #00ff41;
+      border-radius: 5px;
+      margin-top: 10px;
+      transition: background-color 0.3s;
+    }
+
+    .canal-btn:hover {
+      background-color: #00ff41;
+      color: black;
+    }
+
+    #contador-label {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+
+    canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 0;
+    }
+  </style>
 </head>
 <body>
   <canvas id="matrixCanvas"></canvas>
@@ -20,7 +97,7 @@
 
       <button type="submit">INICIAR SPAM</button>
 
-      <a href="https://t.me/STANLEYMODZYT" target="_blank" class="canal-btn" style="margin-top: 10px;">TELEGRAM DO CRIADOR</a>
+      <a href="https://t.me/STANLEYMODZYT" target="_blank" class="canal-btn">TELEGRAM DO CRIADOR</a>
     </form>
 
     <p id="status"></p>
@@ -69,36 +146,38 @@
   </script>
 
   <script>
-    const canvas = document.getElementById('matrixCanvas');
-    const ctx = canvas.getContext('2d');
-    canvas.height = window.innerHeight;
-    canvas.width = window.innerWidth;
+  const canvas = document.getElementById('matrixCanvas');
+  const ctx = canvas.getContext('2d');
 
-    const letters = '01';
-    const fontSize = 14;
-    const columns = canvas.width / fontSize;
-    const drops = Array.from({ length: columns }, () => 1);
+  canvas.height = window.innerHeight;
+  canvas.width = window.innerWidth;
 
-    function draw() {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#f00'; // vermelho
-  ctx.font = `${fontSize}px monospace`;
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*';
+  const fontSize = 16;
+  const columns = canvas.width / fontSize;
+  const drops = Array.from({ length: columns }, () => Math.random() * canvas.height / fontSize);
 
-  drops.forEach((y, x) => {
-    const text = letters.charAt(Math.floor(Math.random() * letters.length));
-    ctx.fillText(text, x * fontSize, y * fontSize);
+  function draw() {
+    // Fundo mais preto com rastros leves
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    if (y * fontSize > canvas.height && Math.random() > 0.975) {
-      drops[x] = 0;
-    }
+    // Letras verdes
+    ctx.fillStyle = '#00ff41';
+    ctx.shadowColor = 'transparent'; // sem brilho exagerado
+    ctx.font = `${fontSize}px monospace`;
 
-    drops[x]++;
-  });
-}
+    drops.forEach((y, i) => {
+      const text = letters.charAt(Math.floor(Math.random() * letters.length));
+      ctx.fillText(text, i * fontSize, y * fontSize);
 
+      if (y * fontSize > canvas.height && Math.random() > 0.975) {
+        drops[i] = 0;
+      }
 
-    setInterval(draw, 33);
-  </script>
-</body>
-</html>
+      drops[i]++;
+    });
+  }
+
+  setInterval(draw, 40);
+</script>
